@@ -1,0 +1,172 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  GIVER
+  SEEKER
+  MODERATOR
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  RESERVED
+  DISTRIBUTED
+  CLOSED
+  EXPIRED
+  UNDER_REVIEW
+  REMOVED
+}
+
+enum ContactMethod {
+  PHONE
+  EMAIL
+  WHATSAPP
+  EXTERNAL_URL
+}
+
+enum FoodCategory {
+  PREPARED_MEALS
+  BAKERY_PASTRY
+  PRODUCE_FRESH
+  DAIRY_CHILLED
+  PACKAGED_PANTRY
+  BEVERAGES
+  MIXED_OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED_ACTION_TAKEN
+  REVIEWED_DISMISSED
+}
+
+enum ReportTargetType {
+  OFFERING
+  REQUEST
+  USER
+  AD
+}
+
+model User {
+  id                    String        @id @default(cuid())
+  email                 String        @unique
+  emailVerified         DateTime?
+  passwordHash          String
+  role                  UserRole
+  status                AccountStatus @default(ACTIVE)
+  contactPersonName     String
+  organizationName      String?
+  privatePhone          String?
+  termsAcceptedAt       DateTime
+  privacyAcceptedAt     DateTime
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  offerings             Offering[]
+  requests              FoodRequest[]
+  reportsSubmitted      AbuseReport[] @relation("Reporter")
+  auditLogs             AuditLog[]
+
+  @@index([role, status])
+}
+
+model Offering {
+  id                            String        @id @default(cuid())
+  giverId                       String
+  giver                         User          @relation(fields: [giverId], references: [id], onDelete: Cascade)
+  title                         String        @db.VarChar(120)
+  description                   String        @db.VarChar(2000)
+  category                      FoodCategory
+  approximateServings           String        @db.VarChar(100)
+  preparedAt                    DateTime?
+  consumeByAt                   DateTime      // Mandatory last date/time food must be consumed/collected
+  collectionWindow              String?       @db.VarChar(255)
+  locality                      String        @db.VarChar(150)
+  collectionNotes               String?       @db.VarChar(500)
+  dietaryAllergenInfo           String?       @db.VarChar(500)
+  photoUrl                      String?
+  photoStorageKey               String?       // S3/R2 object key for cleanup on expiry
+  publishedContactMethod        ContactMethod
+  publishedContactValue         String        @db.VarChar(255)
+  contactPublicationConsent     Boolean       @default(false)
+  authorityAndAccuracyConfirmed Boolean       @default(false)
+  status                        ListingStatus @default(PUBLISHED)
+  expiresAt                     DateTime      // Set to MIN(consumeByAt, userSelectedExpiryAt)
+  distributedAt                 DateTime?     // Set when Giver marks food as Distributed
+  version                       Int           @default(1)
+  createdAt                     DateTime      @default(now())
+  updatedAt                     DateTime      @updatedAt
+
+  @@index([status, consumeByAt, category, locality])
+  @@index([giverId, status])
+}
+
+model FoodRequest {
+  id                            String        @id @default(cuid())
+  seekerId                      String
+  seeker                        User          @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  title                         String        @db.VarChar(120)
+  description                   String        @db.VarChar(2000)
+  preferredCategory             FoodCategory?
+  approximateQuantity           String?       @db.VarChar(100)
+  neededByAt                    DateTime?
+  locality                      String        @db.VarChar(150)
+  displayAuthorName             String        @db.VarChar(120)
+  publishedContactMethod        ContactMethod
+  publishedContactValue         String        @db.VarChar(255)
+  contactPublicationConsent     Boolean       @default(false)
+  status                        ListingStatus @default(PUBLISHED)
+  expiresAt                     DateTime
+  version                       Int           @default(1)
+  createdAt                     DateTime      @default(now())
+  updatedAt                     DateTime      @updatedAt
+
+  @@index([status, expiresAt, preferredCategory, locality])
+  @@index([seekerId, status])
+}
+
+model AbuseReport {
+  id             String           @id @default(cuid())
+  reporterId     String?
+  reporter       User?            @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  targetType     ReportTargetType
+  targetId       String
+  reason         String           @db.VarChar(100)
+  details        String?          @db.VarChar(1000)
+  status         ReportStatus     @default(PENDING)
+  moderatorNotes String?          @db.VarChar(1000)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@index([status, targetType, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(50)
+  targetId   String
+  reason     String?  @db.VarChar(500)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}
