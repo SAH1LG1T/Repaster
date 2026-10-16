@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { env } from "@/config/env";
-
+//none
 interface AdPlacementProps {
   slot: "desktop-rail" | "mobile-feed" | "banner";
   className?: string;
