@@ -30,17 +30,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load persisted session from localStorage
+    // Load persisted session asynchronously to prevent cascading renders
     try {
       const stored = localStorage.getItem("repasters_user");
       if (stored) {
-        setUser(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        queueMicrotask(() => {
+          setUser(parsed);
+          setIsLoading(false);
+        });
+        return;
       }
     } catch (e) {
       console.error("Failed to load user session", e);
-    } finally {
-      setIsLoading(false);
     }
+    queueMicrotask(() => {
+      setIsLoading(false);
+    });
   }, []);
 
   const login = (email: string, role: UserRole = "SEEKER", name = "Community Member", org?: string) => {
