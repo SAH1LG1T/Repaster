@@ -3,7 +3,7 @@ import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { AuthProvider } from "@/context/AuthContext";
-
+//just for deployment
 export const metadata: Metadata = {
   title: "Repasters | Local Food Connect & Surplus Rescue Discovery",
   description:
